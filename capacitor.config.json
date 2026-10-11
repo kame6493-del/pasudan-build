@@ -1,0 +1,8 @@
+{
+  "appId": "jp.pasudan.app",
+  "appName": "パスダン",
+  "webDir": "dist",
+  "backgroundColor": "#1b2a4a",
+  "android": { "allowMixedContent": false },
+  "ios": { "contentInset": "never" }
+}

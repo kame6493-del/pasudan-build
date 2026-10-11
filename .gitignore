@@ -1,0 +1,26 @@
+node_modules
+dist
+*.local
+scripts/e2e_out
+android/app/build
+android/.gradle
+android/local.properties
+ios/App/Pods
+releases/*.apk
+scripts/store_raw
+scripts/art_out
+__pycache__
+scripts/mihon
+scripts/cut_out
+scripts/icon_src
+scripts/fonts/*.ttf
+store/_v1_backup
+scripts/view
+scripts/cut_out
+scripts/icon_out
+scripts/fonts/*.ttf
+releases/*.aab
+
+# 音は assets/audio.enc だけ(sync_build_repo.sh)
+public/sfx/
+public/bgm/

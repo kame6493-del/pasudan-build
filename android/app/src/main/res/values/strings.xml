@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">パスダン</string>
+    <string name="title_activity_main">パスダン</string>
+    <string name="package_name">jp.pasudan.app</string>
+    <string name="custom_url_scheme">jp.pasudan.app</string>
+</resources>

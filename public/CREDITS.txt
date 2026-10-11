@@ -1,0 +1,32 @@
+パスダン(ITパスポート 合格ダンジョン) 素材と出典
+
+問題: 独立行政法人情報処理推進機構(IPA) ITパスポート試験 公開問題(令和6年度・令和7年度・令和8年度)
+  https://www3.jitec.ipa.go.jp/JitesCbt/html/openinfo/questions.html
+  図が必要な問題(令和6年度 問41・問60)は収録していません。解説・用語の説明はアプリ独自のもの。
+効果音: 効果音ラボ(https://soundeffect-lab.info/) と 魔王魂(https://maou.audio/)。音量・長さを調整して使用(scripts/build_sfx.py)
+  効果音：魔王魂
+  decide: 効果音ラボ「決定ボタンを押す18」(RPGのゲームスタート音)
+  select: 魔王魂「レトロ04」(メニュー音)
+  tap: 効果音ラボ「カーソル移動1」
+  slash: 効果音ラボ「剣の素振り2」
+  hit: 効果音ラボ「剣で斬る2」(ゲーム向けの短めの音)
+  crit: 効果音ラボ「斧で斬る2」(クリティカルヒット時)
+  damage: 効果音ラボ「打撃2」
+  wrong: 魔王魂「ワンポイント33」(ハズレ)
+  defeat: 魔王魂「レトロ12」(消滅音)
+  levelup: 効果音ラボ「レベルアップ」
+  coin: 効果音ラボ「アイテムを入手1」(お金)
+  chest: 効果音ラボ「宝箱を開ける」+「キラッ2」を重ねる
+  evolve: 効果音ラボ「ステータス上昇魔法1」
+  combo: 効果音ラボ「シャキーン3」
+  pass: 効果音ラボ「ラッパのファンファーレ」
+  fail: 魔王魂「ワンポイント29」(あちゃー)
+BGM: 魔王魂(https://maou.audio/)。音量の調整と、ループの継ぎ目の無音を削って使用(scripts/build_bgm.py)
+  音楽：魔王魂
+  title: 魔王魂「8bit01」ループ版(城・タイトル)
+  dungeon: 魔王魂「8bit04」ループ版(洞窟の探索)
+  battle: 魔王魂「8bit07」ループ版(戦闘曲)
+  boss: 魔王魂「8bit05」ループ版(戦闘曲・ボス/模擬試験)
+  victory: 魔王魂 旧ゲーム音楽「ジングル01」(勝利)
+書体: M PLUS Rounded 1c  SIL Open Font License 1.1(public/fonts/OFL.txt)
+絵: 持ち主が作成した参考画像(ref_01〜10)から切り出し(scripts/cut_assets.py)
