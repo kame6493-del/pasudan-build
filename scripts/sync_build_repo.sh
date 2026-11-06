@@ -14,7 +14,8 @@ OUT="$BASE/build-repo"
 REMOTE="https://github.com/kame6493-del/pasudan-build.git"
 KEYFILE="$(cygpath -w "$BASE/audio-key.dpapi")"
 
-AUDIO_KEY="$(powershell -NoProfile -Command "\$s = Get-Content '$KEYFILE' | ConvertTo-SecureString; [Console]::Out.Write([System.Net.NetworkCredential]::new('', \$s).Password)")"
+# 合言葉の控えは ProtectedData.Protect の生の形(ConvertFrom-SecureString の文字の形ではない)
+AUDIO_KEY="$(powershell -NoProfile -Command "Add-Type -AssemblyName System.Security; \$b = [IO.File]::ReadAllBytes('$KEYFILE'); [Console]::Out.Write([Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect(\$b, \$null, 'CurrentUser')))")"
 [ -n "$AUDIO_KEY" ] || { echo "合言葉を読めません: $KEYFILE"; exit 1; }
 export AUDIO_KEY
 
@@ -29,7 +30,8 @@ git -C "$OUT" config user.name "$(git -C "$SRC" config user.name)"
 git -C "$OUT" config user.email "$(git -C "$SRC" config user.email)"
 # .git 以外を消して、HEAD をそのまま展開する
 find "$OUT" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-git -C "$SRC" archive HEAD | tar -xf - -C "$OUT"
+# store/(ストアの写真・宣伝動画、約350MB)と releases/ はビルドに要らないので写さない
+git -C "$SRC" archive HEAD -- . ":(exclude)store" ":(exclude)releases" | tar -xf - -C "$OUT"
 rm -rf "$OUT/public/sfx" "$OUT/public/bgm"
 
 TMP="$(mktemp -d)"

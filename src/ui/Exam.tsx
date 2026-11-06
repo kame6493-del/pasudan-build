@@ -6,6 +6,7 @@ import { art, EXAM_BOSS, FIELDS, FIELD_LABEL } from '../domain/world';
 import { cheer, tap } from '../platform/native';
 import { bgm, play } from '../platform/sound';
 import { useBack } from './back';
+import { useQuestionFit } from './qfit';
 import { Choices, QBody, QHead } from './QuestionView';
 import { useStore } from './store';
 
@@ -29,6 +30,7 @@ export function Exam({ year: year0, resume, onExit }: { year?: string; resume?: 
     if (!res) bgm('boss');
   }, [res]);
   const scroller = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   /** 無料の回数は、最初の1問に答えた時に1回と数える(続きからの再開では数えない) */
   const counted = useRef(!!draft);
@@ -113,6 +115,9 @@ export function Exam({ year: year0, resume, onExit }: { year?: string; resume?: 
   };
   useBack(() => void quit());
 
+  // スクロールせずに答える(結果・一覧では外す)
+  useQuestionFit(rootRef, !res && !grid, false, i);
+
   if (res) {
     return (
       <div className="battle" style={{ overflowY: 'auto' }}>
@@ -137,7 +142,7 @@ export function Exam({ year: year0, resume, onExit }: { year?: string; resume?: 
           </div>
           <div className="center" style={{ marginTop: 10 }}>
             <div className="muted">総合の予想点</div>
-            <span style={{ fontSize: 46, fontWeight: 800, color: res.pass ? 'var(--green)' : 'var(--red)' }}>{res.total}</span>
+            <span style={{ fontSize: 46, fontWeight: 800, color: res.pass ? 'var(--hi-green)' : 'var(--hi-red)' }}>{res.total}</span>
             <b className="muted"> / 1000</b>
             <div className="muted small">
               正解 {res.correct} / {qs.length}問（答えた数 {res.answered}）
@@ -145,9 +150,9 @@ export function Exam({ year: year0, resume, onExit }: { year?: string; resume?: 
           </div>
           <div className="score-cols" style={{ marginTop: 10 }}>
             {(['s', 'm', 't'] as const).map((k, n) => (
-              <div key={k} className="kpi" style={{ color: `var(--${k})` }}>
+              <div key={k} className="kpi" style={{ color: `var(--${k}-tx)` }}>
                 {FIELD_LABEL[FIELDS[n]]}
-                <b style={{ color: res[k] >= PASS_FIELD ? `var(--${k})` : 'var(--red)' }}>{res[k]}</b>
+                <b style={{ color: res[k] >= PASS_FIELD ? `var(--${k}-tx)` : 'var(--hi-red)' }}>{res[k]}</b>
                 <span className="muted">/1000</span>
               </div>
             ))}
@@ -182,13 +187,13 @@ export function Exam({ year: year0, resume, onExit }: { year?: string; resume?: 
               style={{ marginTop: 12 }}
               onClick={() => {
                 onExit();
-                askFull(res.pass ? '合格ラインを超えました。本番までに何度も模擬試験で確かめておくと安心です。' : `${failNote(res)}完全版なら模擬試験を何回でも受けて、弱い分野をつぶせます。`);
+                askFull(res.pass ? '合格ラインを超えました。本番までに何度も模擬試験で確かめておくと安心です。' : `${failNote(res)}完全版なら弱い分野だけを集中して解き、模擬試験を何回でも受けて確かめられます。`, 'exam-result');
               }}
             >
               <img src={art('boss_celes')} alt="" />
               <div className="grow">
                 <b>{Number.isFinite(freeExamsLeft(data)) && freeExamsLeft(data) > 0 ? `無料の模擬試験はあと ${freeExamsLeft(data)} 回` : '無料の模擬試験は使い終わりました'}</b>
-                <div className="small">完全版なら模擬試験ボスに何回でも挑戦できます。過去問道場は無料のまま全問解けます</div>
+                <div className="small">{res.pass ? '完全版なら模擬試験ボスに何回でも挑戦できます' : `合格ラインまで あと${Math.max(0, 600 - res.total)}点。完全版で弱い分野を集中して解けます`}</div>
               </div>
               <span className="chev">›</span>
             </button>
@@ -201,7 +206,7 @@ export function Exam({ year: year0, resume, onExit }: { year?: string; resume?: 
   const q = qs[i];
   const done = ans.filter((a) => a !== null).length;
   return (
-    <div className="battle">
+    <div className="battle" ref={rootRef}>
       <div className="stage exam" style={{ backgroundImage: `url(${art('bg_castle_b')})` }}>
         <div className="stage-top">
           <div className="exam-top grow">
@@ -228,7 +233,7 @@ export function Exam({ year: year0, resume, onExit }: { year?: string; resume?: 
         </div>
         <img className="hero alt" src={art('hero_back')} alt="" />
       </div>
-      <div className="qpanel" ref={scroller}>
+      <div className={`qpanel${grid ? '' : ' fitting'}`} ref={scroller}>
         {grid ? (
           <>
             <h3>問題一覧（答えた問題は青）</h3>
@@ -258,8 +263,10 @@ export function Exam({ year: year0, resume, onExit }: { year?: string; resume?: 
         ) : (
           <>
             <QHead q={q} extra={`第${i + 1}問`} />
-            <div className="src" style={{ margin: '-2px 0 6px' }}>{source(q)}</div>
-            <QBody q={q} />
+            <div className="qscroll">
+              <div className="src" style={{ margin: '-2px 0 6px' }}>{source(q)}</div>
+              <QBody q={q} />
+            </div>
             <Choices
               q={q}
               picked={ans[i]}

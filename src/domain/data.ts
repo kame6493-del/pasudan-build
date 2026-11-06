@@ -1,5 +1,6 @@
 import questionsJson from '../data/questions.json';
 import termsJson from '../data/terms.json';
+import choiceExplainJson from '../data/choiceExplain.json';
 import type { AppData, DayLog, ExamDraft, Field, Question, Term } from './types';
 
 export const QUESTIONS = questionsJson as Question[];
@@ -9,6 +10,14 @@ export const TERM_BY_ID = new Map(TERMS.map((t) => [t.id, t]));
 /** 問題 id → その問題が中心の用語 id */
 export const TERMS_OF_Q = new Map<string, string[]>();
 for (const t of TERMS) for (const id of t.q) TERMS_OF_Q.set(id, [...(TERMS_OF_Q.get(id) ?? []), t.id]);
+
+/** 問題 id → 選択肢ごとの解説(正解の位置は空文字)。2026-10-16 テスターの要望で足した */
+export const CHOICE_EXPLAIN = choiceExplainJson as Record<string, string[]>;
+/** その問題の選択肢ごとの解説。無ければ空の配列 */
+export const choiceExplain = (q: Question): string[] => {
+  const v = CHOICE_EXPLAIN[q.id];
+  return Array.isArray(v) && v.length === q.choices.length ? v : [];
+};
 
 export const source = (q: Question) => `出典: 独立行政法人情報処理推進機構 ITパスポート試験 ${q.year} 問${q.no}`;
 
@@ -62,6 +71,17 @@ export function emptyData(): AppData {
     bgm: true,
     bgmVol: 0.5,
     sfxVol: 1,
+    calm: null,
+    items: {},
+    petBond: {},
+    stars: {},
+    foes: {},
+    level: null,
+    tutorialDone: false,
+    guided: false,
+    course: {},
+    known: {},
+    learnTip: false,
   };
 }
 
@@ -102,7 +122,29 @@ export function normalize(raw: unknown): AppData {
     bgm: r.bgm !== false,
     bgmVol: Math.min(1, Math.max(0, num(r.bgmVol, base.bgmVol))),
     sfxVol: Math.min(1, Math.max(0, num(r.sfxVol, base.sfxVol))),
+    calm: typeof r.calm === 'boolean' ? r.calm : null,
+    items: numMap(r.items, 0, 3),
+    petBond: numMap(r.petBond, 0, 1e6),
+    stars: numMap(r.stars, 0, 3),
+    foes: numMap(r.foes, 0, 1e9),
+    level: r.level === 'new' || r.level === 'some' || r.level === 'past' ? r.level : null,
+    // 前の版から使っている人は、案内とガイドを見終えたことにする
+    tutorialDone: r.tutorialDone === true || (r.tutorialDone === undefined && r.onboarded === true),
+    guided: r.guided === true || (r.guided === undefined && r.onboarded === true),
+    course: numMap(r.course, 0, 3),
+    known: numMap(r.known, 0, 1),
+    learnTip: r.learnTip === true,
   };
+}
+
+/** 数の表(壊れた値・範囲外は捨てる・丸める) */
+function numMap(v: unknown, lo: number, hi: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof x === 'number' && Number.isFinite(x)) out[k] = Math.min(hi, Math.max(lo, Math.floor(x)));
+  }
+  return out;
 }
 
 function normalizeDraft(v: unknown): ExamDraft | null {
@@ -118,3 +160,11 @@ function normalizeDraft(v: unknown): ExamDraft | null {
 }
 
 export const questionsOf = (field: Field) => QUESTIONS.filter((q) => q.field === field);
+
+/**
+ * 「動きを少なく」が効いているか。自分で選んでいればそれ、まだなら端末の設定(prefers-reduced-motion)に合わせる。
+ * 初めはオフ(ゲームの演出が売りのため)。端末で動きを減らしている人だけ初めからオン。
+ */
+export function calmOn(d: Pick<AppData, 'calm'>, osReduce: boolean): boolean {
+  return d.calm ?? osReduce;
+}

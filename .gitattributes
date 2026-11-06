@@ -1,0 +1,22 @@
+# 画像・音・動画・書体・アーカイブは改行の変換をしない(core.autocrlf=true でも壊さない)
+*.mp3   binary
+*.m4a   binary
+*.ogg   binary
+*.wav   binary
+*.mp4   binary
+*.webp  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.jar   binary
+*.aab   binary
+*.apk   binary
+*.zip   binary
+*.keystore binary
+*.jks   binary

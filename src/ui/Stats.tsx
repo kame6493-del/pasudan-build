@@ -54,10 +54,10 @@ export function Stats() {
               <div key={f} className="kpi" style={{ textAlign: 'center' }}>
                 <img src={art(`book_${f}`)} alt="" style={{ height: 30 }} />
                 <div className="nowrap" style={{ fontSize: 12, letterSpacing: '-0.02em' }}>{FIELD_LABEL[f]}</div>
-                {a.n ? <b style={{ color: `var(--${f[0]})` }}>{pct}%</b> : <b className="unmeasured">未計測</b>}
+                {a.n ? <b style={{ color: `var(--${f[0]}-tx)` }}>{pct}%</b> : <b className="unmeasured">未計測</b>}
                 <div style={{ height: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4 }}>
                   <i style={{ display: 'block', width: 18, height: `${pct * 0.6}px`, background: `var(--${f[0]})`, borderRadius: 4 }} />
-                  <i style={{ display: 'block', width: 18, height: '36px', background: '#d8d2e2', borderRadius: 4 }} title="合格の目安 60%" />
+                  <i style={{ display: 'block', width: 18, height: '36px', background: '#4a5268', borderRadius: 4 }} title="合格の目安 60%" />
                 </div>
                 <div className="muted small">
                   {a.n}回中 {a.c}回正解
@@ -100,7 +100,7 @@ export function Stats() {
             <p className="muted small">2日分の記録がたまると線で出ます。今の予想点: {p.total ?? '未計測'}</p>
           )
         ) : (
-          <button className="btn paper sm" onClick={() => askFull('予想点の推移などのくわしい分析は完全版で見られます。')}>
+          <button className="btn paper sm" onClick={() => askFull('予想点の推移などのくわしい分析は完全版で見られます。', 'stats')}>
             <LockIcon color="#6b5a48" /> くわしい分析は完全版
           </button>
         )}
@@ -128,12 +128,12 @@ export function Stats() {
                     <span className="bar" style={{ width: 90, height: 10 }}>
                       <i style={{ width: `${pct}%`, background: pct < 60 ? 'var(--red)' : 'var(--green)' }} />
                     </span>
-                    <b style={{ width: 44, textAlign: 'right', color: pct < 60 ? 'var(--red)' : 'var(--ink)' }}>{pct}%</b>
+                    <b style={{ width: 44, textAlign: 'right', color: pct < 60 ? 'var(--hi-red)' : 'var(--ink)' }}>{pct}%</b>
                   </button>
                 );
               })}
               {!data.owned.full && rows.length > 3 && (
-                <button className="btn paper sm" style={{ marginTop: 8 }} onClick={() => askFull('30テーマすべての正答率と、予想点の推移を見られます。弱いテーマから順につぶすのが合格への近道です。')}>
+                <button className="btn paper sm" style={{ marginTop: 8 }} onClick={() => askFull('30テーマすべての正答率と、予想点の推移を見られます。弱いテーマから順につぶすのが合格への近道です。', 'stats')}>
                   <LockIcon color="#6b5a48" /> 残り{rows.length - 3}テーマは完全版で
                 </button>
               )}
@@ -155,7 +155,7 @@ export function Stats() {
         <div className="kpi">
           <img src={art('tab_nigate')} alt="" style={{ height: 30, float: 'right' }} />
           苦手克服数
-          <b style={{ color: 'var(--m)' }}>{data.weakClearedTotal}問</b>
+          <b style={{ color: '#ffa95e' }}>{data.weakClearedTotal}問</b>
         </div>
         <div className="kpi">
           <img src={art('boss_celes')} alt="" style={{ height: 30, float: 'right' }} />

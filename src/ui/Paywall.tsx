@@ -1,35 +1,34 @@
-import { CONFIG } from '../config';
-import { QUESTIONS, TERMS } from '../domain/data';
-import { FREE_EXAMS, freeFloorCount, freeNoteCount, predict } from '../domain/game';
+import { TERMS } from '../domain/data';
+import { FREE_DAILY, FREE_EXAMS, FREE_FOREST_FLOORS, FREE_TRIAL_FLOORS, FREE_UNITS, freeFloorCount, predict } from '../domain/game';
+import { UNITS } from '../data/course';
 import { art, DUNGEONS, FIELDS } from '../domain/world';
-import type { Product } from '../platform/billing';
+import { shownPrice, type Product } from '../platform/billing';
 import { Check, LockIcon } from './icons';
-import { useStore } from './store';
+import { useStore, type PaywallPreview } from './store';
 
-/** 完全版で増えること。絵と一言で、何ができるようになるかが一目で分かるように */
+/** 完全版で増えること。大きな利点3つ(2026-11-04: 無料と同じ物は並べない) */
 const FEATURES = [
-  { img: art('mon_gearknight'), t: '全30階を冒険', d: '城と塔の中ボスまで' },
-  { img: art('boss_celes'), t: '模試ボス 何回でも', d: '本番形式・合否と足切り' },
-  { img: art('tab_chart'), t: '分野別の予想点', d: '推移と30テーマの分析' },
-  { img: art('crown'), t: 'カードが金に進化', d: `${TERMS.length}枚の図鑑を完成` },
+  { img: art('boss_celes'), t: '本番形式の模擬試験を何回でも', d: '100問・120分。合否と分野ごとの足切りまで判定' },
+  { img: art('mon_gearknight'), t: '全30階と、分野別の集中', d: '苦手な分野だけをまとめて解いて、弱点をつぶす' },
+  { img: art('owl_teacher'), t: `ゼロから学ぶ道 全${UNITS.length}単元`, d: `やさしい説明と用語カード${TERMS.length}枚を全部` },
 ];
 
-export function Paywall({ reason, onClose }: { reason: string; onClose: () => void }) {
-  const { data, billing, buy, go, restorePurchases } = useStore();
-  const price = (p: Product) => (billing.status === 'ready' ? billing.items[p].price : CONFIG.products[p].fallbackPrice);
+export function Paywall({ reason, preview, onClose }: { reason: string; preview?: PaywallPreview; onClose: () => void }) {
+  const { data, billing, buy, restorePurchases } = useStore();
+  const price = (p: Product) => shownPrice(billing, p);
   const p = predict(data);
   const can = billing.status === 'ready';
   const allFloors = FIELDS.reduce((n, f) => n + DUNGEONS[f].floors.length, 0);
 
-  // 各欄は文節の配列。文節の途中では折り返さない(<wbr> の所だけで折る)
+  // 各欄は文節の配列。文節の途中では折り返さない(<wbr> の所だけで折る)。無料と同じ物は並べない
   const rows: [string[], string[], string[]][] = [
-    [['過去問道場'], [`${QUESTIONS.length}問`, '解説つき'], [`${QUESTIONS.length}問`, '解説つき']],
-    [['ダンジョン'], [`${freeFloorCount()}階`, '（森の全階と', '城・塔の', '3階ずつ）'], [`全${allFloors}階`]],
     [['模擬試験', 'ボス'], [`${FREE_EXAMS}回`], ['何回でも']],
+    [['分野別の', '集中'], ['なし'], ['苦手な', '分野から']],
+    [['ゼロから', '学ぶ道'], [`各分野`, `${FREE_UNITS}単元`], [`全${UNITS.length}単元`]],
+    [['用語カード'], ['銀まで'], [`${TERMS.length}枚・`, '金に進化']],
+    [['ダンジョン'], [`${freeFloorCount()}階`, `（森${FREE_FOREST_FLOORS}階・`, `城と塔`, `${FREE_TRIAL_FLOORS}階ずつ）`], [`全${allFloors}階`]],
     [['予想点'], ['総合だけ'], ['分野別・', '推移']],
-    [['テーマ別の', '正答率'], ['低い', '3テーマ'], [`${allFloors}テーマ`]],
-    [['要点ノート'], [`${freeNoteCount()}テーマ`], [`${allFloors}テーマ`]],
-    [['用語カード'], ['銀まで'], ['金に進化']],
+    [['過去問道場'], [`1日${FREE_DAILY}問`], ['上限なし']],
   ];
   const cell = (parts: string[]) => parts.map((x, k) => (k ? [<wbr key={k} />, x] : x));
 
@@ -44,6 +43,21 @@ export function Paywall({ reason, onClose }: { reason: string; onClose: () => vo
           </div>
         </div>
         <p className="pw-reason">{reason}</p>
+        {preview && (
+          <div className="pw-preview">
+            <b>{preview.title}</b>
+            {preview.imgs && preview.imgs.length > 0 && (
+              <div className="pw-preview-imgs">
+                {preview.imgs.map((x, i) => (
+                  <img key={i} src={x} alt="" />
+                ))}
+              </div>
+            )}
+            {preview.lines?.map((x, i) => (
+              <p key={i}>{x}</p>
+            ))}
+          </div>
+        )}
         <div className="pw-feats">
           {FEATURES.map((f) => (
             <div key={f.t} className="pw-feat">
@@ -72,7 +86,7 @@ export function Paywall({ reason, onClose }: { reason: string; onClose: () => vo
                 <td>{cell(k)}</td>
                 <td>{cell(a)}</td>
                 <td className="full">
-                  <Check color="var(--green)" /> {cell(b)}
+                  <Check color="var(--hi-green)" /> {cell(b)}
                 </td>
               </tr>
             ))}
@@ -101,20 +115,9 @@ export function Paywall({ reason, onClose }: { reason: string; onClose: () => vo
             )}
           </>
         )}
-        <div className="btns">
-          <button
-            className="btn paper sm"
-            onClick={() => {
-              onClose();
-              go({ name: 'kakomon' });
-            }}
-          >
-            過去問道場へ
-          </button>
-          <button className="btn paper sm" onClick={onClose}>
-            あとで
-          </button>
-        </div>
+        <button className="btn paper sm" style={{ marginTop: 8 }} onClick={onClose}>
+          あとで
+        </button>
         <button className="pw-restore" onClick={() => void restorePurchases()}>
           <LockIcon size={11} color="#8d8174" /> 購入を復元する
         </button>

@@ -24,6 +24,29 @@ def save(name, im, maxw=None):
 def key(n, box, k=PAPER, tol=22, **kw):
     return C.cut_key(R[n], box, k, tol=tol, beige=True, **kw)
 
+def key_fit(n, box, k=PAPER, tol=22, step=3, limit=48, stop=None, **kw):
+    """key と同じだが、抜いた形が切り抜きの縁に触れている辺を少しずつ広げ、体が丸ごと入るまで探す
+    (2026-10-18 敵・相棒の端が切れていた対策)。stop は広げてよい限界の box"""
+    x0, y0, x1, y1 = box
+    sx0, sy0, sx1, sy1 = stop or (box[0] - limit, box[1] - limit, box[2] + limit, box[3] + limit)
+    for _ in range(64):
+        im = C.cut_key(R[n], (x0, y0, x1, y1), k, tol=tol, beige=True, **kw)
+        ox, oy = im.info.get("off", (0, 0))
+        w, h = x1 - x0, y1 - y0
+        a = im.getchannel("A")
+        bb = a.point(lambda v: 255 if v > 24 else 0).getbbox() or (0, 0, 0, 0)
+        L, T, Rr, B = ox + bb[0] <= 0, oy + bb[1] <= 0, ox + bb[2] >= w, oy + bb[3] >= h
+        grown = False
+        if L and x0 - step >= sx0: x0 -= step; grown = True
+        if T and y0 - step >= sy0: y0 -= step; grown = True
+        if Rr and x1 + step <= sx1: x1 += step; grown = True
+        if B and y1 + step <= sy1: y1 += step; grown = True
+        if not grown:
+            if L or T or Rr or B:
+                print("  まだ縁に触れている", (x0, y0, x1, y1), dict(L=L, T=T, R=Rr, B=B))
+            return im
+    return im
+
 def outline(n, box, **kw):
     return C.cut_outline(R[n], box, **kw)
 
@@ -34,12 +57,13 @@ def rect(n, box):
     return R[n].crop(box)
 
 # ---- モンスター(ref_10 の素材シート) ----
-save("mon_woodgolem", key(10, (34, 1244, 190, 1372)))
-save("mon_mushroom", key(10, (198, 1284, 284, 1366)))
-save("mon_gearknight", key(10, (320, 1250, 460, 1372)))
-save("mon_mechabit", key(10, (466, 1266, 556, 1372)))
-save("mon_virus", key(10, (676, 1288, 764, 1368)))
-save("mon_icedragon", key(10, (764, 1242, 924, 1372)))
+save("mon_woodgolem", key_fit(10, (34, 1244, 190, 1372)))
+save("mon_mushroom", key_fit(10, (198, 1284, 284, 1366)))
+save("mon_gearknight", key_fit(10, (320, 1250, 460, 1372)))
+save("mon_mechabit", key_fit(10, (466, 1266, 556, 1372)))
+save("mon_virus", key_fit(10, (676, 1288, 764, 1368)))
+# 上の札(青い帯)と角の先がつながるので、札の行(1244 より上)は消してから取る
+save("mon_icedragon", key_fit(10, (764, 1238, 924, 1372), stop=(740, 1238, 936, 1378), sub=[("rect", (0, 0, 400, 6))]))
 
 # ---- 部品(ref_10) ----
 save("ui_heart", key(10, (30, 668, 92, 726)))
@@ -69,12 +93,12 @@ save("lv_badge", key(10, (853, 1500, 929, 1572)))
 
 # ---- 主人公・相棒(ref_02 C の選択カード) ----
 CARD = [(246, 249, 253), (254, 254, 254), (253, 246, 234), (254, 249, 236), (250, 242, 227)]
-save("hero_hood", key(2, (646, 586, 768, 706), k=CARD, tol=16))
-save("hero_fox", key(2, (788, 584, 898, 706), k=CARD, tol=16))
+save("hero_hood", key_fit(2, (646, 586, 768, 706), k=CARD, tol=16))
+save("hero_fox", key_fit(2, (788, 584, 898, 706), k=CARD, tol=16))
 save("hero_catmage", key(2, (654, 784, 770, 913), k=CARD, tol=16))
 save("hero_knight", key(2, (788, 786, 901, 913), k=CARD, tol=16))
-save("pet_owl", key(2, (750, 1054, 806, 1111), k=CARD + [(233, 228, 226)], tol=16))
-save("pet_dragon", key(2, (834, 1042, 902, 1111), k=CARD, tol=16))
+save("pet_owl", key_fit(2, (750, 1054, 806, 1111), k=CARD + [(233, 228, 226)], tol=16))
+save("pet_dragon", key_fit(2, (834, 1042, 902, 1111), k=CARD, tol=16))
 
 # ---- 場面の上のキャラ(輪郭で抜く) ----
 def grab(n, box, **kw):
@@ -146,10 +170,10 @@ save("bg_tower_b", scene(4, (25, 1190, 306, 1282), scale=1.4))
 save("bg_pass", scene(6, (642, 540, 908, 726), scale=1.4))
 
 # ---- 相棒(ref_09 D の見た目セット。動物だけ) ----
-save("pet_brown", key(9, (598, 1444, 646, 1500), k=[(250, 243, 228), (248, 240, 222)], tol=18))
-save("pet_orange", key(9, (666, 1444, 714, 1500), k=[(250, 243, 228), (248, 240, 222)], tol=18))
+save("pet_brown", key_fit(9, (598, 1444, 646, 1500), k=[(250, 243, 228), (248, 240, 222)], tol=18))
+save("pet_orange", key_fit(9, (666, 1444, 714, 1500), k=[(250, 243, 228), (248, 240, 222)], tol=18))
 save("pet_black", key(9, (732, 1444, 782, 1500), k=[(250, 243, 228), (248, 240, 222)], tol=18))
-save("pet_dragon2", key(9, (798, 1440, 858, 1500), k=[(250, 243, 228), (248, 240, 222)], tol=18))
+save("pet_dragon2", key_fit(9, (798, 1440, 858, 1500), k=[(250, 243, 228), (248, 240, 222)], tol=18))
 
 # ---- 用語カードの絵(ref_07 B。カードの窓をそのまま) ----
 for nm, b in {"card_doc": (353, 668, 459, 774), "card_robot": (490, 668, 594, 774), "card_chain": (353, 876, 459, 982),

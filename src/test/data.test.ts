@@ -42,11 +42,11 @@ import type { AppData } from '../domain/types';
 describe('無料と完全版の境目', () => {
   const free = emptyData();
   const full = { ...emptyData(), owned: { full: true, looks: false } };
-  it('ダンジョンは森の全階と、城・塔の最初の3階が無料', () => {
-    expect(FREE_TRIAL_FLOORS).toBe(3);
+  it('ダンジョンは森の最初の5階と、城・塔の最初の2階が無料(2026-11-04 見直し)', () => {
+    expect(FREE_TRIAL_FLOORS).toBe(2);
     for (const q of QUESTIONS) {
       const floor = DUNGEONS[q.field].floors.indexOf(q.topic);
-      expect(questionOpen(free, q)).toBe(q.field === 'strategy' || floor < FREE_TRIAL_FLOORS);
+      expect(questionOpen(free, q)).toBe(floor < (q.field === 'strategy' ? 5 : FREE_TRIAL_FLOORS));
       expect(questionOpen(full, q)).toBe(true);
     }
   });
@@ -57,14 +57,14 @@ describe('無料と完全版の境目', () => {
       }
     }
   });
-  it('要点ノートの無料は16テーマ(森10・城3・塔3)', () => {
-    expect(freeNoteCount()).toBe(16);
+  it('要点ノートの無料は9テーマ(森5・城2・塔2)', () => {
+    expect(freeNoteCount()).toBe(9);
   });
-  it('模擬試験は無料で2回、完全版は何回でも', () => {
-    expect(FREE_EXAMS).toBe(2);
-    expect(freeExamsLeft(free)).toBe(2);
-    expect(canTakeExam({ ...free, freeExams: 1 })).toBe(true);
-    expect(canTakeExam({ ...free, freeExams: 2 })).toBe(false);
+  it('模擬試験は無料で1回、完全版は何回でも', () => {
+    expect(FREE_EXAMS).toBe(1);
+    expect(freeExamsLeft(free)).toBe(1);
+    expect(canTakeExam({ ...free, freeExams: 0 })).toBe(true);
+    expect(canTakeExam({ ...free, freeExams: 1 })).toBe(false);
     expect(canTakeExam({ ...full, freeExams: 9 })).toBe(true);
     // 前の版の「1回使った」は1回と数える
     const { freeExams: _x, ...old } = emptyData();

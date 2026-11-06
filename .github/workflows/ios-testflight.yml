@@ -50,8 +50,11 @@ jobs:
       - name: Test, build web assets and sync the iOS project
         run: |
           npm test
-          npm run build
+          VITE_IOS=1 npm run build
+          rm -f dist/phone.html
           npx cap sync ios
+          if grep -rq "mockbuy" ios/App/App/public; then echo "::error::疑似購入の道が iOS の中身に残っています"; exit 1; fi
+          if [ -e ios/App/App/public/phone.html ]; then echo "::error::phone.html が残っています"; exit 1; fi
 
       - name: Compile without signing
         if: inputs.compile_only

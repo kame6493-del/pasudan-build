@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { QUESTIONS } from '../domain/data';
-import { progressOf, topicQuestions, yearQuestions, YEARS } from '../domain/game';
+import { FREE_DAILY, practiceLeft, progressOf, topicQuestions, yearQuestions, YEARS } from '../domain/game';
+import { todayKey } from '../domain/data';
 import type { AppData, Question } from '../domain/types';
 import { art, DUNGEONS, FIELDS, FIELD_LABEL } from '../domain/world';
 import { useStore } from './store';
@@ -14,13 +15,15 @@ export function practiceOrder(d: AppData, qs: Question[]): { ids: string[]; from
   return { ids: qs.slice(from).map((q) => q.id), from };
 }
 
-/** 過去問モード。年度別・分野別(テーマ別)に、990問すべてを解説つきで解ける。無料・1日の上限なし */
+/** 過去問モード。年度別・分野別(テーマ別)に、990問すべてを解説つきで解ける。無料は1日 FREE_DAILY 問まで、完全版は上限なし */
 export function Kakomon() {
-  const { data, go, startBattle } = useStore();
+  const { data, go, startBattle, askFull } = useStore();
+  const left = practiceLeft(data, todayKey());
   const [view, setView] = useState<View>('year');
   const all = progressOf(data, QUESTIONS);
 
   const start = (qs: Question[], title: string, sub: string, wrongOnly = false) => {
+    if (left <= 0) return askFull(`今日の無料の${FREE_DAILY}問を解き終えました。明日また${FREE_DAILY}問解けます。完全版なら上限なしで、苦手な分野だけをまとめて解くこともできます。`, 'kakomon-limit');
     if (wrongOnly) {
       const ids = qs.filter((q) => data.qs[q.id]?.last === 0).map((q) => q.id);
       if (ids.length) startBattle({ kind: 'practice', ids, title, sub: `${sub} まちがえた問題` });
@@ -79,8 +82,11 @@ export function Kakomon() {
       <div className="panel kk-head">
         <img src={art('owl_teacher')} alt="" />
         <div className="grow">
-          <b>{QUESTIONS.length}問 ぜんぶ無料・解説つき</b>
-          <div className="small muted">IPA が公開している ITパスポート試験の過去問を、年度別・分野別に解けます。1日の上限はありません。</div>
+          <b>{QUESTIONS.length}問 ぜんぶ解説つき</b>
+          <div className="small muted">
+            IPA が公開している ITパスポート試験の過去問を、年度別・分野別に解けます。
+            {data.owned.full ? '完全版なので1日の上限はありません。' : `無料で1日${FREE_DAILY}問まで(今日はあと${left}問)。`}
+          </div>
           <div className="row" style={{ marginTop: 6, gap: 8 }}>
             <div className="bar grow" style={{ height: 10 }}>
               <i style={{ width: `${(all.done / all.total) * 100}%` }} />
@@ -114,7 +120,7 @@ export function Kakomon() {
             </p>
             {FIELDS.map((f) => (
               <div key={f}>
-                <h3 className="kk-field" style={{ color: DUNGEONS[f].color }}>
+                <h3 className="kk-field" style={{ color: `var(--${f[0]}-tx)` }}>
                   <img src={DUNGEONS[f].book} alt="" />
                   {FIELD_LABEL[f]}
                 </h3>

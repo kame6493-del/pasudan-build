@@ -1,6 +1,7 @@
 import { addDays, emptyData, emptyDay, Q_BY_ID, QUESTIONS, TERMS_OF_Q, todayKey } from './data';
 import type { AppData, DayLog, Field, Question } from './types';
 import { DUNGEONS, EXAM_MIX, FIELD_LABEL, FIELDS } from './world';
+import { easeScore, figLen, needsCalc } from './format';
 
 // ---------- レベル・強さ ----------
 /** レベル n から n+1 に上がるのに要る経験値 */
@@ -19,22 +20,43 @@ export function levelOf(xp: number): { lv: number; into: number; need: number } 
 export const heroHp = (lv: number) => 80 + (lv - 1) * 10;
 export const heroAtk = (lv: number) => 24 + (lv - 1) * 4;
 
-/** 敵の HP。ふつうの敵はおよそ2回、中ボスは4〜5回の正解で倒れる */
-export const enemyHp = (lv: number, boss: boolean, floor: number) => Math.round(heroAtk(lv) * (boss ? 4.4 : 1.9) * (1 + floor * 0.02));
+/**
+ * 序盤のゆるさ(0=ふつう〜1=いちばんゆるい)。各ダンジョンの1〜3階を、慣れるまでの階としてゆるくする。
+ * 4階からは元の強さ。
+ */
+export const EASY_FLOORS = 3;
+export const earlyEase = (floor: number) => (floor < 0 ? 0 : Math.max(0, (EASY_FLOORS - floor) / EASY_FLOORS));
 
-/** 早押しクリティカルの持ち時間(秒)。問題文が長いほど長い */
-export function critWindow(q: Question): number {
-  const len = q.q.length + q.choices.join('').length + (q.table ? q.table.flat().join('').length : 0) + (q.code?.length ?? 0);
-  return Math.min(45, Math.round(8 + len / 9));
+/** 敵の HP。ふつうの敵はおよそ2回、中ボスは4〜5回(1階は3〜4回)の正解で倒れる */
+export const enemyHp = (lv: number, boss: boolean, floor: number) =>
+  Math.round(heroAtk(lv) * (boss ? 4.4 - 1.1 * earlyEase(floor) : 1.9) * (1 + floor * 0.02));
+
+/**
+ * 計算の問題に足す早押しの持ち時間(秒)。文字数だけで決めると、短い文で計算をさせる問題
+ * (稼働率・損益分岐点・転送時間・表計算・擬似言語など)は読み終えてから手を動かす時間が足りない。
+ * 見分け方は needsCalc(数値の条件と計算の語・数値が3つ以上・答えが数値だけ・プログラム)。
+ */
+export const CALC_BONUS = 15;
+/** 計算の問題の早押しの最短(秒) */
+export const CALC_MIN = 30;
+/** 早押しクリティカルの持ち時間(秒)。問題文が長いほど長い。計算の問題は CALC_BONUS 秒のばす */
+export function critWindow(q: Question, floor = -1): number {
+  const len = q.q.length + q.choices.join('').length + (q.table ? q.table.flat().join('').length : 0) + (q.code?.length ?? 0) + figLen(q);
+  const calc = needsCalc(q);
+  // 序盤の階は早押しの持ち時間を長めに(1階 +6秒)
+  const t = Math.round(8 + len / 9 + 6 * earlyEase(floor) + (calc ? CALC_BONUS : 0));
+  // 計算の問題は短い文でも 30 秒はとる(サイコロの確率など、文は短いが手を動かす問題)
+  return calc ? Math.min(51 + CALC_BONUS, Math.max(CALC_MIN, t)) : Math.min(51, t);
 }
 /** 1問の制限時間(秒)。過ぎても負けにはならず、クリティカルが出ないだけ */
-export const timeLimit = (q: Question) => critWindow(q) + 30;
+export const timeLimit = (q: Question, floor = -1) => critWindow(q, floor) + 30;
 
 export function damage(lv: number, combo: number, crit: boolean, rand = Math.random()): number {
   const base = heroAtk(lv) * (1 + Math.min(combo, 10) * 0.08) * (crit ? 1.7 : 1);
   return Math.round(base * (0.92 + rand * 0.16));
 }
-export const enemyHit = (lv: number, boss: boolean) => Math.round(heroHp(lv) * (boss ? 0.3 : 0.24));
+/** 敵の攻撃(まちがえた時に受けるダメージ)。1階はふつうの敵で HP の 14%(7回まちがえても倒れない)、4階から 24% */
+export const enemyHit = (lv: number, boss: boolean, floor = -1) => Math.round(heroHp(lv) * ((boss ? 0.3 : 0.24) - 0.1 * earlyEase(floor)));
 
 // ---------- 出題 ----------
 function shuffle<T>(a: T[], rnd = Math.random): T[] {
@@ -76,25 +98,74 @@ export function floorPool(field: Field, floor: number): Question[] {
 /** 1つの階: ふつうの敵5体と中ボス。1体に3問ぶん用意しておく(余れば次へ回す) */
 export const FLOOR_ENEMIES = 6;
 
-export function floorQuestions(d: AppData, field: Field, floor: number): Question[] {
-  // 足りない分は同じ分野の「入れる階」の問題で埋める(無料のお試し階から鍵の階の問題が出ないように)
-  return pickQuestions(d, floorPool(field, floor), 24, QUESTIONS.filter((q) => q.field === field && questionOpen(d, q)));
-}
+const EASE = new Map<string, number>();
+export const easeOf = (q: Question) => {
+  let v = EASE.get(q.id);
+  if (v === undefined) EASE.set(q.id, (v = easeScore(q)));
+  return v;
+};
+const byEase = (a: Question, b: Question) => easeOf(a) - easeOf(b);
 
 /**
- * 無料と完全版の線引き
- * - 過去問モード(年度別・分野別): 無料で全問・解説つき・1日の上限なし
- * - ダンジョン: ストラテジの森は全階、城と塔は最初の FREE_TRIAL_FLOORS 階まで無料
- * - 模擬試験ボス: 無料で FREE_EXAMS 回(ランダム・年度別どちらでも)。完全版は何回でも
- * - 完全版だけ: 城と塔の残りの階・模擬試験何回でも・分野別の予想点と推移・テーマ別の全分析・用語カードの金進化
+ * 序盤の階の出題: 易しい問題(短い・用語を問う・計算なし)から出す。
+ * 1階は易しい方の半分から選んで易しい順に、2階・3階は少しずつ元の出し方に近づけ、4階からは元どおり。
  */
-export const FREE_TRIAL_FLOORS = 3;
-export const FREE_EXAMS = 2;
+export function easyFirst(d: AppData, pool: Question[], count: number, ease: number, fallback: Question[]): Question[] {
+  if (ease <= 0) return pickQuestions(d, pool, count, fallback);
+  const sorted = [...pool].sort(byEase);
+  const keep = Math.max(1, Math.ceil(sorted.length * (1 - 0.5 * ease)));
+  const easy = sorted.slice(0, keep);
+  const rest = sorted.slice(keep);
+  const head = pickQuestions(d, easy, Math.min(count, easy.length));
+  const more = pickQuestions(d, rest, Math.min(count - head.length, rest.length));
+  let out = [...head, ...more];
+  if (out.length < count) {
+    const need = count - out.length;
+    const fb = fallback.filter((q) => !out.includes(q)).sort(byEase);
+    out = [...out, ...pickQuestions(d, fb.slice(0, need * 3), need, fb)];
+  }
+  // 並べ方: 易しさの順と元の並びを ease の割合でまぜる(1階はほぼ易しい順)
+  const rank = new Map([...out].sort(byEase).map((q, i) => [q, i]));
+  const keyOf = (q: Question, i: number) => (rank.get(q) ?? i) * ease + i * (1 - ease) + Math.random() * 2 * (1 - ease);
+  return out
+    .map((q, i) => ({ q, k: keyOf(q, i) }))
+    .sort((a, b) => a.k - b.k)
+    .map((x) => x.q)
+    .slice(0, count);
+}
+
+export function floorQuestions(d: AppData, field: Field, floor: number): Question[] {
+  // 足りない分は同じ分野の「入れる階」の問題で埋める(無料のお試し階から鍵の階の問題が出ないように)
+  return easyFirst(d, floorPool(field, floor), 24, earlyEase(floor), QUESTIONS.filter((q) => q.field === field && questionOpen(d, q)));
+}
+
+/** 解いた数が少ないうちは「今日のダンジョン」も易しい問題から(30問まで1階なみ、90問で元どおり) */
+export const beginnerEase = (d: AppData) => {
+  const n = Object.keys(d.qs).length;
+  return n >= 90 ? 0 : n < 30 ? 1 : (90 - n) / 60;
+};
+
+/**
+ * 無料と完全版の線引き(2026-11-04 見直し。購入画面に当たる所を前に出し、最初の数階の楽しさは残す)
+ * - 過去問道場(年度別・分野別): 解説つきで全問解けるが、無料は1日 FREE_DAILY 問まで(苦手の復習・ダンジョンは数えない)
+ * - ダンジョン: ストラテジの森は FREE_FOREST_FLOORS 階、城と塔は FREE_TRIAL_FLOORS 階まで無料
+ * - 模擬試験ボス: 無料で FREE_EXAMS 回。完全版は何回でも
+ * - ゼロから学ぶ道: 各分野の最初の FREE_UNITS 単元まで無料
+ * - 完全版だけ: 残りの階・模擬試験何回でも・分野別の集中・分野別の予想点と推移・テーマ別の全分析・用語カードの金進化・学ぶ道の続き
+ */
+export const FREE_FOREST_FLOORS = 5;
+export const FREE_TRIAL_FLOORS = 2;
+export const FREE_EXAMS = 1;
+export const FREE_DAILY = 30;
+export const FREE_UNITS = 3;
+export const freeFloorsOf = (field: Field) => (field === 'strategy' ? FREE_FOREST_FLOORS : FREE_TRIAL_FLOORS);
 export function floorOpen(d: AppData, field: Field, floor: number): boolean {
-  return d.owned.full || field === 'strategy' || floor < FREE_TRIAL_FLOORS;
+  return d.owned.full || floor < freeFloorsOf(field);
 }
 export const freeExamsLeft = (d: AppData) => (d.owned.full ? Infinity : Math.max(0, FREE_EXAMS - d.freeExams));
 export const canTakeExam = (d: AppData) => freeExamsLeft(d) > 0;
+/** 過去問道場の、今日の無料のこり問数(完全版は Infinity) */
+export const practiceLeft = (d: AppData, key: string) => (d.owned.full ? Infinity : Math.max(0, FREE_DAILY - (d.days[key]?.counted ?? 0)));
 /** 用語カードの金進化は完全版で */
 export const canEvolve = (d: AppData) => d.owned.full;
 
@@ -102,7 +173,7 @@ export const canEvolve = (d: AppData) => d.owned.full;
 export function questionOpen(d: AppData, q: Question): boolean {
   if (d.owned.full) return true;
   const floor = DUNGEONS[q.field].floors.indexOf(q.topic);
-  if (floor < 0) return q.field === 'strategy';
+  if (floor < 0) return false;
   return floorOpen(d, q.field, floor);
 }
 
@@ -119,16 +190,23 @@ export function freeNoteCount(): number {
 }
 
 export function availableFields(d: AppData): Field[] {
-  return d.owned.full ? FIELDS : ['strategy'];
+  return FIELDS.filter((f) => d.owned.full || freeFloorsOf(f) > 0);
 }
 
 /** ダンジョン(今日のダンジョン・ゴースト)に出せる問題: 入れる階のテーマの問題 */
 export const dungeonPool = (d: AppData) => QUESTIONS.filter((q) => questionOpen(d, q));
 
-export function dailyQuestions(d: AppData): Question[] {
+/** weakMax = 苦手から出す数の上限(ニガテ退治の日は 6) */
+export function dailyQuestions(d: AppData, weakMax = 4): Question[] {
   const pool = dungeonPool(d);
   const weak = pool.filter((q) => q.id in d.weak);
-  return pickQuestions(d, [...shuffle(weak).slice(0, 4), ...shuffle(pool.filter((q) => !(q.id in d.weak)))].slice(0, 60), 10, pool).slice(0, 10);
+  const ease = beginnerEase(d);
+  if (ease > 0) {
+    const easyPool = [...pool.filter((q) => !(q.id in d.weak))].sort(byEase).slice(0, Math.ceil(pool.length * (1 - 0.6 * ease)));
+    const w = shuffle(weak).slice(0, weakMax);
+    return [...w, ...easyFirst(d, easyPool, 10 - w.length, ease, pool)].slice(0, 10);
+  }
+  return pickQuestions(d, [...shuffle(weak).slice(0, weakMax), ...shuffle(pool.filter((q) => !(q.id in d.weak)))].slice(0, 60), 10, pool).slice(0, 10);
 }
 
 /** 模擬試験の制限時間(秒)。本番は100問120分。問題数に合わせて分単位で決める(選ぶ画面と時計の表示をそろえる) */
@@ -349,4 +427,25 @@ export function accuracy(d: AppData, f: Field): { n: number; c: number } {
     c += s.c;
   }
   return { n, c };
+}
+
+/**
+ * 分野別の集中(完全版): その分野で正答率の低いテーマから、まだ正解していない問題を n 問。
+ * まだ解いていないテーマは正答率 0 とみなして先に出す。
+ */
+export function focusQuestions(d: AppData, f: Field, n = 10): Question[] {
+  const rate = new Map(topicStats(d).filter((t) => t.field === f).map((t) => [t.topic, t.n ? t.c / t.n : 0]));
+  const notYet = QUESTIONS.filter((q) => q.field === f && !(d.qs[q.id]?.last === 1));
+  return shuffle(notYet)
+    .sort((a, b) => (rate.get(a.topic) ?? 0) - (rate.get(b.topic) ?? 0))
+    .slice(0, n);
+}
+
+/** 分野の弱いテーマ(正答率の低い順、解いた物だけ) */
+export function weakTopics(d: AppData, f: Field, n = 3): { topic: string; pct: number }[] {
+  return topicStats(d)
+    .filter((t) => t.field === f && t.n > 0)
+    .map((t) => ({ topic: t.topic, pct: Math.round((t.c / t.n) * 100) }))
+    .sort((a, b) => a.pct - b.pct)
+    .slice(0, n);
 }

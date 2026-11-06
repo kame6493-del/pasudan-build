@@ -9,13 +9,13 @@
  */
 import { App as CapApp } from '@capacitor/app';
 
-export type Sfx = 'decide' | 'select' | 'tap' | 'slash' | 'hit' | 'crit' | 'damage' | 'wrong' | 'defeat' | 'levelup' | 'coin' | 'chest' | 'evolve' | 'combo' | 'pass' | 'fail';
+export type Sfx = 'decide' | 'select' | 'tap' | 'slash' | 'hit' | 'crit' | 'mslash' | 'mhit' | 'mcrit' | 'damage' | 'wrong' | 'defeat' | 'levelup' | 'coin' | 'chest' | 'evolve' | 'combo' | 'pass' | 'fail' | 'heal' | 'charge' | 'escape' | 'skill';
 /** 場面ごとの曲。victory だけはループせず 1 回鳴らして止まる */
 export type Bgm = 'title' | 'dungeon' | 'battle' | 'boss' | 'victory';
 
 const BASE_VOL = 0.8;
 // 何度も鳴る tap と、斬る→当たる(140ms 差で重なる)の slash だけ下げる
-const VOL: Partial<Record<Sfx, number>> = { slash: 0.75, tap: 0.55 };
+const VOL: Partial<Record<Sfx, number>> = { slash: 0.75, mslash: 0.75, tap: 0.55 };
 /** BGM の音量の初期値(0〜1)。効果音より控えめ */
 export const DEFAULT_BGM_VOLUME = 0.5;
 /** 0〜1 の設定値を実際の音量に直す倍率(設定 0.5 で効果音より 10dB ほど小さい) */
@@ -118,7 +118,13 @@ export function unlock() {
 }
 
 export function preload() {
-  (['decide', 'select', 'tap', 'slash', 'hit', 'crit', 'damage', 'wrong', 'defeat', 'combo'] as Sfx[]).forEach((s) => void load(s));
+  (['decide', 'select', 'tap', 'slash', 'hit', 'crit', 'mslash', 'mhit', 'mcrit', 'damage', 'wrong', 'defeat', 'combo'] as Sfx[]).forEach((s) => void load(s));
+}
+
+/** 攻撃の音。魔法で戦う見た目(ネコの魔法使い)は魔法の音、ほかは剣の音 */
+export function attackSfx(heroId: string, crit: boolean): [Sfx, Sfx] {
+  const magic = heroId === 'catmage';
+  return magic ? ['mslash', crit ? 'mcrit' : 'mhit'] : ['slash', crit ? 'crit' : 'hit'];
 }
 
 export async function play(name: Sfx) {

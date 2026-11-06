@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Q_BY_ID, QUESTIONS, source } from '../domain/data';
-import { weakQuestions } from '../domain/game';
+import { accuracy, focusQuestions, weakQuestions, weakTopics } from '../domain/game';
 import type { Field } from '../domain/types';
 import { art, FIELDS, FIELD_LABEL, PETS } from '../domain/world';
 import { useStore } from './store';
+import { LockIcon } from './icons';
 
 export function Nigate() {
-  const { data, startBattle } = useStore();
+  const { data, startBattle, askFull } = useStore();
   const [f, setF] = useState<Field | 'all'>('all');
   const pet = PETS.find((p) => p.id === data.pet) ?? PETS[0];
   const weakIds = Object.keys(data.weak).filter((id) => Q_BY_ID.has(id));
@@ -45,7 +46,7 @@ export function Nigate() {
           <b className="grow" style={{ fontSize: 18 }}>
             あなたの苦手
           </b>
-          <b style={{ fontSize: 36, color: 'var(--red)' }}>{weakIds.length}</b>
+          <b style={{ fontSize: 36, color: 'var(--hi-red)' }}>{weakIds.length}</b>
           <b>問</b>
         </div>
         {FIELDS.map((x) => (
@@ -67,6 +68,36 @@ export function Nigate() {
         <img src={art('tab_nigate')} alt="" />
         苦手だけ復習する
       </button>
+
+      <div className="panel">
+        <h3>分野別の集中</h3>
+        <p className="muted small" style={{ margin: '0 0 6px' }}>正答率の低いテーマから、まだ正解していない問題を10問まとめて解きます。</p>
+        {FIELDS.map((x) => {
+          const a = accuracy(data, x);
+          const wt = weakTopics(data, x);
+          return (
+            <button
+              key={x}
+              className="focus-row"
+              onClick={() => {
+                if (!data.owned.full)
+                  return askFull(`${FIELD_LABEL[x]}の弱いテーマから、まだ正解していない問題をまとめて解けます。`, 'focus', {
+                    title: `あなたの${FIELD_LABEL[x]}の弱いテーマ`,
+                    lines: wt.length ? wt.map((t) => `${t.topic} 正答率${t.pct}%`) : ['まだ解いた問題が少ないので、解いていないテーマから出します。'],
+                  });
+                startBattle({ kind: 'review', ids: focusQuestions(data, x).map((q) => q.id), title: `${FIELD_LABEL[x]}を集中` });
+              }}
+            >
+              <span className={`chip ${x}`}>{FIELD_LABEL[x]}</span>
+              <span className="grow small muted">
+                {a.n ? `正答率 ${Math.round((a.c / a.n) * 100)}%` : 'まだ解いていない'}
+                {wt[0] ? `・弱い: ${wt[0].topic}` : ''}
+              </span>
+              {data.owned.full ? <span className="chev">›</span> : <LockIcon size={16} />}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="panel">
         <h3>苦手問題一覧</h3>
@@ -92,7 +123,7 @@ export function Nigate() {
                 </div>
                 <div className="src">{source(q)}</div>
                 <div className="row small" style={{ marginTop: 4, fontWeight: 800 }}>
-                  <span style={{ color: s ? 'var(--m)' : 'var(--red)' }}>{s ? 'あと1回正解で克服' : '前回不正解'}</span>
+                  <span style={{ color: s ? 'var(--m-tx)' : 'var(--hi-red)' }}>{s ? 'あと1回正解で克服' : '前回不正解'}</span>
                   <div className="bar" style={{ width: 70, height: 8 }}>
                     <i style={{ width: `${s * 50}%`, background: 'var(--m)' }} />
                   </div>

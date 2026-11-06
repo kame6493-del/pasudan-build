@@ -16,7 +16,7 @@ export function ExamPicker({ onClose }: { onClose: () => void }) {
     return xs.length ? Math.max(...xs.map((e) => e.total)) : null;
   };
   const start = async (year?: string) => {
-    if (!ok) return askFull(`無料の模擬試験（${FREE_EXAMS}回）は使い終わりました。完全版なら本番と同じ100問・120分の模擬試験に何回でも挑戦できます。過去問道場は無料のまま全問解けます。`);
+    if (!ok) return askFull(`無料の模擬試験（${FREE_EXAMS}回）は使い終わりました。完全版なら本番と同じ100問・120分の模擬試験に何回でも挑戦できます。弱い分野を見つけて、合格ラインまで何点足りないかを何度でも確かめられます。`, 'exam-limit');
     if (draft && !(await confirm({ body: '途中の模擬試験があります。新しく始めると、途中の解答は消えます。', ok: '新しく始める', cancel: 'やめる', danger: true }))) return;
     if (draft) update((d) => ({ ...d, examDraft: null }));
     onClose();
@@ -40,7 +40,7 @@ export function ExamPicker({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         {draft && (
-          <div className="panel" style={{ marginTop: 10, background: '#fffdf6' }}>
+          <div className="panel" style={{ marginTop: 10, background: 'var(--inset)' }}>
             <b>途中の模擬試験があります</b>
             <div className="muted small">
               {draft.year ?? 'ランダム模試'} ・ {draft.ans.filter((a) => a !== null).length} / {draft.ids.length}問 答えた ・ 残り {Math.max(0, Math.ceil(examLimitMin(draft.ids.length) - draft.elapsed / 60000))}分
@@ -65,7 +65,7 @@ export function ExamPicker({ onClose }: { onClose: () => void }) {
               </>
             ) : (
               <>
-                無料の {FREE_EXAMS} 回は使いました。年度別の過去問は「過去問道場」で無料のまま解けます。
+                無料の {FREE_EXAMS} 回は使いました。
               </>
             )}
           </div>

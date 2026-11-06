@@ -1,67 +1,41 @@
 import { useState } from 'react';
 import { CONFIG } from '../config';
-import { addDays, emptyData, QUESTIONS, TERMS, todayKey } from '../domain/data';
+import { addDays, calmOn, emptyData, QUESTIONS, TERMS, todayKey } from '../domain/data';
 import { resetMock } from '../platform/billing';
 import { play, setBgm, setBgmVolume, setSfxVolume, setSound } from '../platform/sound';
 import { clearData } from '../platform/storage';
 import { Calendar } from './Onboarding';
+import { useOsReduceMotion } from './motion';
 import { useStore } from './store';
+import { Tutorial } from './Tutorial';
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const { data, update, go, restorePurchases, confirm } = useStore();
-  const [page, setPage] = useState<'main' | 'date' | 'credits'>('main');
+  const [page, setPage] = useState<'main' | 'date' | 'credits' | 'tutorial'>('main');
   const [date, setDate] = useState(data.examDate ?? addDays(todayKey(), 90));
+  const calm = calmOn(data, useOsReduceMotion());
   const years = [...new Set(QUESTIONS.map((q) => q.year))].join('・');
 
   return (
     <div className="sheet-bg" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        {page === 'tutorial' && <Tutorial onDone={() => setPage('main')} last="とじる" />}
         {page === 'main' && (
           <>
             <h2>設定</h2>
+            <SoundControls />
             <button
               className="list-btn"
-              onClick={() => {
-                const on = !data.bgm;
-                setBgm(on);
-                update((d) => ({ ...d, bgm: on }));
-              }}
+              role="switch"
+              aria-checked={calm}
+              onClick={() => update((d) => ({ ...d, calm: !calm }))}
             >
-              BGM
-              <span className={`toggle ${data.bgm ? 'on' : ''}`} />
+              <span className="grow">
+                動きを少なく
+                <span className="muted small calm-note">問題を解く間は敵・相棒・背景を止め、当たり・はずれの演出も短くします</span>
+              </span>
+              <span className={`toggle ${calm ? 'on' : ''}`} />
             </button>
-            {data.bgm && (
-              <VolumeRow
-                label="BGM の音量"
-                value={data.bgmVol}
-                onChange={(v) => {
-                  setBgmVolume(v);
-                  update((d) => ({ ...d, bgmVol: v }));
-                }}
-              />
-            )}
-            <button
-              className="list-btn"
-              onClick={() => {
-                const on = !data.sound;
-                setSound(on);
-                update((d) => ({ ...d, sound: on }));
-              }}
-            >
-              効果音
-              <span className={`toggle ${data.sound ? 'on' : ''}`} />
-            </button>
-            {data.sound && (
-              <VolumeRow
-                label="効果音の音量"
-                value={data.sfxVol}
-                onChange={(v) => {
-                  setSfxVolume(v);
-                  update((d) => ({ ...d, sfxVol: v }));
-                }}
-                onCommit={() => void play('coin')}
-              />
-            )}
             <button className="list-btn" onClick={() => setPage('date')}>
               試験日
               <span className="muted">{data.examDate ?? '未設定'} ›</span>
@@ -73,7 +47,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 go({ name: 'tab', tab: 'shop' });
               }}
             >
-              主人公・相棒の見た目 <span className="muted">›</span>
+              主人公・相棒の着がえ <span className="muted nowrap">ショップ ›</span>
             </button>
             <button className="list-btn" onClick={() => void restorePurchases()}>
               購入を復元する <span className="muted">›</span>
@@ -84,9 +58,12 @@ export function Settings({ onClose }: { onClose: () => void }) {
             <a className="list-btn" href={CONFIG.privacyUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
               プライバシーポリシー <span className="muted">›</span>
             </a>
+            <a className="list-btn" href={CONFIG.supportUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+              お問い合わせ・サポート <span className="muted">›</span>
+            </a>
             <button
               className="list-btn"
-              style={{ color: 'var(--red)' }}
+              style={{ color: 'var(--hi-red)' }}
               onClick={async () => {
                 if (!(await confirm({ title: '記録をすべて消しますか？', body: '学習の記録・コイン・カードがすべて消えます。元に戻せません（購入は消えません）。', ok: '消す', cancel: 'やめる', danger: true }))) return;
                 await clearData();
@@ -102,7 +79,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             <p className="muted small">
               {CONFIG.appName}({CONFIG.fullName}) v{CONFIG.version}
               <br />
-              記録はこの端末の中だけに保存されます。アカウントやサーバーは使いません。
+              記録はこの端末の中だけに保存されます。アカウントは要りません(購入の確認だけストアと RevenueCat を通します)。
             </p>
             <button className="btn paper sm" onClick={onClose}>
               とじる
@@ -161,10 +138,64 @@ export function Settings({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** 音量のつまみ(0〜100%)。動かしている間も音量が変わる。指を離したら onCommit(効果音の試し鳴らし) */
-function VolumeRow({ label, value, onChange, onCommit }: { label: string; value: number; onChange: (v: number) => void; onCommit?: () => void }) {
+/** BGM と効果音の切り替えと音量(設定と、戦いの中の音の窓で同じ物を使う)。変えた値はすぐ鳴っている音に効き、記録に残る */
+export function SoundControls() {
+  const { data, update } = useStore();
   return (
-    <label className="list-btn" style={{ gap: 12 }}>
+    <>
+      <button
+        className="list-btn"
+        role="switch"
+        aria-checked={data.bgm}
+        onClick={() => {
+          const on = !data.bgm;
+          setBgm(on);
+          update((d) => ({ ...d, bgm: on }));
+        }}
+      >
+        BGM
+        <span className={`toggle ${data.bgm ? 'on' : ''}`} />
+      </button>
+      <VolumeRow
+        label="BGM の音量"
+        value={data.bgmVol}
+        disabled={!data.bgm}
+        onChange={(v) => {
+          setBgmVolume(v);
+          update((d) => ({ ...d, bgmVol: v }));
+        }}
+      />
+      <button
+        className="list-btn"
+        role="switch"
+        aria-checked={data.sound}
+        onClick={() => {
+          const on = !data.sound;
+          setSound(on);
+          update((d) => ({ ...d, sound: on }));
+        }}
+      >
+        効果音
+        <span className={`toggle ${data.sound ? 'on' : ''}`} />
+      </button>
+      <VolumeRow
+        label="効果音の音量"
+        value={data.sfxVol}
+        disabled={!data.sound}
+        onChange={(v) => {
+          setSfxVolume(v);
+          update((d) => ({ ...d, sfxVol: v }));
+        }}
+        onCommit={() => void play('coin')}
+      />
+    </>
+  );
+}
+
+/** 音量のつまみ(0〜100%)。動かしている間も音量が変わる。指を離したら onCommit(効果音の試し鳴らし) */
+function VolumeRow({ label, value, onChange, onCommit, disabled }: { label: string; value: number; onChange: (v: number) => void; onCommit?: () => void; disabled?: boolean }) {
+  return (
+    <label className="list-btn" style={{ gap: 12, opacity: disabled ? 0.45 : 1 }}>
       <span style={{ whiteSpace: 'nowrap', fontSize: 14 }}>{label}</span>
       <input
         type="range"
@@ -173,12 +204,13 @@ function VolumeRow({ label, value, onChange, onCommit }: { label: string; value:
         step={5}
         value={Math.round(value * 100)}
         aria-label={label}
+        disabled={disabled}
         style={{ flex: 1, minWidth: 0, accentColor: 'var(--green)' }}
         onChange={(e) => onChange(Number(e.target.value) / 100)}
         onPointerUp={onCommit}
         onKeyUp={onCommit}
       />
-      <span className="muted" style={{ width: 40, textAlign: 'right', fontSize: 13 }}>
+      <span className="muted" style={{ minWidth: 40, textAlign: 'right', fontSize: 13, whiteSpace: 'nowrap' }}>
         {Math.round(value * 100)}%
       </span>
     </label>

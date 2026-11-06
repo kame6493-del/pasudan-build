@@ -1,5 +1,5 @@
 """
-効果音 16 個を、ダウンロードした素材(効果音ラボ・魔王魂)から作る。
+効果音 23 個を、ダウンロードした素材(効果音ラボ・魔王魂)から作る。
 
     python scripts/build_sfx.py           # public/sfx/*.mp3 を書き出す
     python scripts/build_sfx.py --check   # あわせて ../sfx_check/ に波形の絵・数値・試聴ページを出す
@@ -34,12 +34,20 @@ PEAK = 10 ** (-1.0 / 20)
 
 # name: (素材, [重ねる素材(秒)], 最大の長さ(秒), 目標の大きさ dBFS, 説明)
 RECIPE = {
-    'decide':  ('lab/decision18', [], 0.9, -15, '効果音ラボ「決定ボタンを押す18」(RPGのゲームスタート音)'),
+    # 2026-11-04 決定の音を差し替え(持ち主「決定ボタン音ちょっとおかしい」。前の「決定ボタンを押す18」は 0.8 秒のゲームスタートの音で、毎回のボタンには重かった)
+    'decide':  ('lab/decision35', [], 0.3, -17, '効果音ラボ「決定ボタンを押す35」(ポピッ)'),
     'select':  ('maou/maou_se_8bit04', [], None, -17, '魔王魂「レトロ04」(メニュー音)'),
     'tap':     ('lab/cursor1', [], None, -19, '効果音ラボ「カーソル移動1」'),
-    'slash':   ('lab/sword-gesture2', [], None, -16, '効果音ラボ「剣の素振り2」'),
-    'hit':     ('lab/sword-slash2', [], None, -14, '効果音ラボ「剣で斬る2」(ゲーム向けの短めの音)'),
-    'crit':    ('lab/ax-slash-2', [], None, -12, '効果音ラボ「斧で斬る2」(クリティカルヒット時)'),
+    # 2026-11-04 攻撃の音を差し替え(持ち主「攻撃の効果音が気になる」。前の「剣で斬る2」は 5kHz より上が6割の高い音だった)
+    'slash':   ('lab/sword-gesture3', [], 0.3, -17, '効果音ラボ「剣の素振り3」(小剣を振る)'),
+    'hit':     ('maou/maou_se_battle03', [], 0.5, -14, '魔王魂「戦闘03」(斬る音)'),
+    'crit':    ('maou/maou_se_battle06', [('lab/punch-high2', 0.0, 0.55)], 0.8, -12,
+                '魔王魂「戦闘06」(深く斬る音)+効果音ラボ「大パンチ」を重ねる(クリティカル)'),
+    # 魔法で戦う見た目(ネコの魔法使い)の攻撃
+    'mslash':  ('lab/magic-wind1', [], 0.35, -18, '効果音ラボ「風魔法1」(杖を振る)'),
+    'mhit':    ('lab/magic-flame1', [], 0.6, -14, '効果音ラボ「火炎魔法1」(火の球)'),
+    'mcrit':   ('lab/magic-flame1', [('lab/punch-high2', 0.05, 0.5)], 0.8, -12,
+                '効果音ラボ「火炎魔法1」+「大パンチ」を重ねる(魔法のクリティカル)'),
     'damage':  ('lab/blow2', [], None, -14, '効果音ラボ「打撃2」'),
     'wrong':   ('maou/maou_se_onepoint33', [], None, -17, '魔王魂「ワンポイント33」(ハズレ)'),
     'defeat':  ('maou/maou_se_8bit12', [], None, -14, '魔王魂「レトロ12」(消滅音)'),
@@ -51,6 +59,11 @@ RECIPE = {
     'combo':   ('lab/shakin3', [], 1.3, -15, '効果音ラボ「シャキーン3」'),
     'pass':    ('lab/trumpet1', [], None, -13, '効果音ラボ「ラッパのファンファーレ」'),
     'fail':    ('maou/maou_se_onepoint29', [], 1.8, -16, '魔王魂「ワンポイント29」(あちゃー)'),
+    # 2026-10-18 ダンジョンのしかけ用
+    'heal':    ('lab/magic-cure2', [], 1.4, -15, '効果音ラボ「回復魔法2」(中回復)'),
+    'charge':  ('maou/maou_se_magical10', [], 1.4, -16, '魔王魂「マジカル10」(オーラをまとう)'),
+    'escape':  ('lab/stupid5', [], 1.2, -17, '効果音ラボ「間抜け5」(気の抜ける音)'),
+    'skill':   ('lab/magic-statusup2', [], 1.4, -14, '効果音ラボ「ステータス上昇魔法2」'),
 }
 
 
@@ -143,7 +156,7 @@ def report(rows):
     import matplotlib.pyplot as plt
 
     CHECK.mkdir(parents=True, exist_ok=True)
-    fig, axes = plt.subplots(8, 2, figsize=(14, 16))
+    fig, axes = plt.subplots(12, 2, figsize=(14, 22))
     for ax, r in zip(axes.T.flat, rows):
         d = r['data']
         ax.plot(np.arange(len(d)) / SR, d, lw=0.4, color='#2b5fb4')

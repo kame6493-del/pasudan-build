@@ -14,7 +14,14 @@ export interface Question {
   terms: string[];
   table?: string[][];
   code?: string;
+  /** 2枚目以降の表・冊子から切り出した図。問題文(と table)のあとに順に出す(2026-11-05) */
+  figs?: Fig[];
 }
+
+/** 問題の表・図。表のセルの "__文字__" は下線(主キー)。図は public/ からの相対パス */
+export type Fig =
+  | { t: 'table'; rows: string[][]; cap?: string }
+  | { t: 'img'; src: string; alt: string; w: number; h: number; cap?: string };
 
 export type CardArt = 'doc' | 'robot' | 'chain' | 'shield' | 'chart' | 'books' | 'db';
 
@@ -116,4 +123,26 @@ export interface AppData {
   bgmVol: number;
   /** 効果音の音量(0〜1) */
   sfxVol: number;
+  /** 動きを少なく(true=オン / false=オフ / null=まだ選んでいない → 端末の「視差効果を減らす」に合わせる) */
+  calm: boolean | null;
+  /** 持っているアイテム(各 ITEM_MAX まで) */
+  items: Partial<Record<'herb' | 'sand' | 'charm' | 'potion', number>>;
+  /** 相棒ごとのなかよし度(正解の数) */
+  petBond: Record<string, number>;
+  /** 階のクリアの星 'strategy:0' → 1〜3 */
+  stars: Record<string, number>;
+  /** 倒した敵の数(敵の key → 回数)。モンスター図鑑 */
+  foes: Record<string, number>;
+  /** ITパスポートは初めてか(最初に聞く)。new=まったく初めて / some=少し知っている / past=過去問を解きたい / null=まだ聞いていない */
+  level: 'new' | 'some' | 'past' | null;
+  /** 遊び方の案内を見終えたか */
+  tutorialDone: boolean;
+  /** 最初の1戦のガイドを見終えたか */
+  guided: boolean;
+  /** ゼロから学ぶ道: 単元 id → 進んだ段(1=説明を読んだ 2=カードを見た 3=問題を解いた) */
+  course: Record<string, number>;
+  /** 覚えるカードで「覚えた」にした用語 */
+  known: Record<string, number>;
+  /** 学ぶの「ここを押せば始まります」を見たか(1回だけ出す) */
+  learnTip: boolean;
 }

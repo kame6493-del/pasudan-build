@@ -1,11 +1,13 @@
+import { MonsterBook } from './Monsters';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { todayKey } from '../domain/data';
+import { calmOn, todayKey } from '../domain/data';
 import { liveStreak, predict } from '../domain/game';
 import type { AppData } from '../domain/types';
 import { art } from '../domain/world';
-import { loadBilling, purchase, restore, type BillingState, type Product } from '../platform/billing';
+import { loadBilling, purchase, restore, setAttrs, type BillingState, type Product } from '../platform/billing';
+import { boughtAttrs, paywallAttrs } from '../domain/track';
 import { tap } from '../platform/native';
 import { bgm, play, preload, setBgm, setBgmVolume, setSfxVolume, setSound, unlock, type Bgm } from '../platform/sound';
 import { loadData, saveData } from '../platform/storage';
@@ -24,13 +26,16 @@ import { Settings } from './Settings';
 import { Shop } from './Shop';
 import { Stats } from './Stats';
 import { backToTop, useBack } from './back';
-import { StoreCtx, useStore, type Ask, type BattleMode, type Reward, type Route, type Store, type Tab } from './store';
+import { StoreCtx, useStore, type Ask, type PaywallPreview, type BattleMode, type Reward, type Route, type Store, type Tab } from './store';
 import { Title } from './Title';
+import { useFitLabels } from './fit';
+import { applyCalm, useOsReduceMotion } from './motion';
 import { TermDetail, Zukan, ZukanList } from './Zukan';
+import { AboutView, CourseHome, Flashcards, UnitView } from './Learn';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'dungeon', label: 'ダンジョン', icon: art('tab_dungeon') },
-  { id: 'zukan', label: '図鑑', icon: art('tab_book') },
+  { id: 'zukan', label: '学ぶ', icon: art('tab_book') },
   { id: 'nigate', label: '苦手', icon: art('tab_nigate') },
   { id: 'stats', label: '成績', icon: art('tab_chart') },
   { id: 'shop', label: 'ショップ', icon: art('tab_shop') },
@@ -39,7 +44,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 const tabOf = (r: Route): Tab | null => {
   if (r.name === 'tab') return r.tab;
   if (r.name === 'map' || r.name === 'kakomon') return 'dungeon';
-  if (r.name === 'zukanList' || r.name === 'term' || r.name === 'notes' || r.name === 'note') return 'zukan';
+  if (r.name === 'zukanList' || r.name === 'term' || r.name === 'notes' || r.name === 'note' || r.name === 'course' || r.name === 'about' || r.name === 'unit' || r.name === 'cards' || r.name === 'bestiary') return 'zukan';
   return null;
 };
 
@@ -51,10 +56,15 @@ export function App() {
   const [billing, setBilling] = useState<BillingState>({ status: 'loading' });
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
-  const [fullAsk, setFullAsk] = useState<string | null>(null);
+  const [fullAsk, setFullAsk] = useState<{ reason: string; from: string; preview?: PaywallPreview } | null>(null);
+  const lastFrom = useRef('other');
   const [examPick, setExamPick] = useState(false);
   const [ask, setAsk] = useState<(Ask & { resolve: (ok: boolean) => void }) | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const tabbarRef = useFitLabels<HTMLElement>('.tab-label');
+  const osReduce = useOsReduceMotion();
+  const calm = data ? calmOn(data, osReduce) : osReduce;
+  useEffect(() => applyCalm(calm), [calm]);
 
   useEffect(() => {
     loadData().then((d) => {
@@ -107,6 +117,7 @@ export function App() {
       try {
         const ok = await purchase(billing, p);
         if (ok) {
+          void setAttrs(boughtAttrs(lastFrom.current));
           update((d) => ({ ...d, owned: p === 'bundle' ? { full: true, looks: true } : { ...d.owned, [p]: true } }));
           setFullAsk(null);
           toast(p === 'looks' ? '見た目セットを手に入れました！' : '完全版になりました。すべてのダンジョンが開きました！');
@@ -182,7 +193,18 @@ export function App() {
         restorePurchases,
         toast,
         openSettings: () => setSettings(true),
-        askFull: (reason: string) => setFullAsk(reason),
+        askFull: (reason: string, from = 'other', preview?: PaywallPreview) => {
+          lastFrom.current = from;
+          setFullAsk({ reason, from, preview });
+          let n = 1;
+          try {
+            n = Number(localStorage.getItem('pasudan.paywallOpened') ?? '0') + 1;
+            localStorage.setItem('pasudan.paywallOpened', String(n));
+          } catch {
+            /* 数えられなくても開く */
+          }
+          void setAttrs(paywallAttrs(from, n, Object.keys(data.qs).length));
+        },
         openExams: () => setExamPick(true),
         confirm: confirmAsk,
       },
@@ -224,6 +246,11 @@ export function App() {
               {route.name === 'map' && <MapScreen field={route.field} />}
               {route.name === 'kakomon' && <Kakomon />}
               {route.name === 'tab' && route.tab === 'zukan' && <Zukan />}
+              {route.name === 'course' && <CourseHome />}
+              {route.name === 'about' && <AboutView />}
+              {route.name === 'unit' && <UnitView key={route.id} id={route.id} />}
+              {route.name === 'cards' && <Flashcards />}
+              {route.name === 'bestiary' && <MonsterBook />}
               {route.name === 'zukanList' && <ZukanList field={route.field} />}
               {route.name === 'term' && <TermDetail id={route.id} back={route.back} />}
               {route.name === 'notes' && <NotesList field={route.field} />}
@@ -232,11 +259,11 @@ export function App() {
               {route.name === 'tab' && route.tab === 'stats' && <Stats />}
               {route.name === 'tab' && route.tab === 'shop' && <Shop />}
             </div>
-            <nav className="tabbar">
+            <nav className="tabbar" ref={tabbarRef}>
               {TABS.map((t) => (
                 <button key={t.id} className={`tab ${tab === t.id ? 'on' : ''}`} onClick={() => go({ name: 'tab', tab: t.id })} aria-label={t.label}>
                   <img src={t.icon} alt="" />
-                  {t.label}
+                  <span className="tab-label">{t.label}</span>
                 </button>
               ))}
             </nav>
@@ -249,7 +276,7 @@ export function App() {
           <Rewards items={rewards} onDone={doneRewards} />
         )}
         {settings && <Settings onClose={() => setSettings(false)} />}
-        {fullAsk && <Paywall reason={fullAsk} onClose={() => setFullAsk(null)} />}
+        {fullAsk && <Paywall reason={fullAsk.reason} preview={fullAsk.preview} onClose={() => setFullAsk(null)} />}
         {ask && (
           <Confirm
             ask={ask}
@@ -279,7 +306,13 @@ function parentOf(r: Route): Route | null {
       return { name: 'tab', tab: 'dungeon' };
     case 'zukanList':
     case 'notes':
+    case 'course':
+    case 'bestiary':
       return { name: 'tab', tab: 'zukan' };
+    case 'about':
+    case 'unit':
+    case 'cards':
+      return { name: 'course' };
     case 'term':
     case 'note':
       return r.back;

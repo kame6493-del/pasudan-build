@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TERM_BY_ID } from '../domain/data';
 import { heroAtk, heroHp } from '../domain/game';
+import { gaugeNeed, ITEM_INFO, PET_SKILL, SKILL_INFO, type ItemId } from '../domain/gimmick';
 import { art, HEROES, PETS } from '../domain/world';
 import { cheer } from '../platform/native';
 import { play } from '../platform/sound';
@@ -16,7 +17,7 @@ export function Rewards({ items, onDone }: { items: Reward[]; onDone: () => void
 
   useEffect(() => {
     if (!r) return;
-    const s = r.kind === 'levelup' ? 'levelup' : r.kind === 'evolve' ? 'evolve' : r.kind === 'chest' ? 'chest' : r.kind === 'fail' ? null : 'coin';
+    const s = r.kind === 'levelup' || r.kind === 'bond' ? 'levelup' : r.kind === 'evolve' ? 'evolve' : r.kind === 'chest' ? 'chest' : r.kind === 'fail' ? null : 'coin';
     if (s) void play(s);
     if (r.kind === 'chest') window.setTimeout(() => void play('coin'), 500);
     if (r.kind !== 'fail') cheer();
@@ -33,10 +34,19 @@ export function Rewards({ items, onDone }: { items: Reward[]; onDone: () => void
           <div className="head sign" style={{ fontSize: 19, textAlign: 'center', width: 'auto', maxWidth: '92%' }}>
             {r.title}
           </div>
-          <img src={hero.battle} alt="" style={{ height: 130, marginTop: 16, position: 'relative' }} />
-          <Items coins={r.coins} xp={r.xp} cards={r.cards} />
+          {r.stars !== undefined && (
+            <div className="stars-row" aria-label={`星${r.stars}つ`}>
+              {[1, 2, 3].map((n) => (
+                <img key={n} src={art('star')} alt="" className={n <= r.stars! ? 'on' : ''} style={{ animationDelay: `${0.15 * n}s` }} />
+              ))}
+              <span>{r.stars === 3 ? 'ノーミス！' : r.stars === 2 ? 'まちがい2つ以下' : 'クリア'}{r.starNew ? '　記録更新' : ''}</span>
+            </div>
+          )}
+          <img src={hero.battle} alt="" style={{ height: r.stars !== undefined ? 100 : 130, marginTop: 12, position: 'relative' }} />
+          <Items coins={r.coins} xp={r.xp} cards={r.cards} items={r.items} />
         </>
       )}
+      {r.kind === 'bond' && <Bond pet={r.pet} to={r.to} />}
       {r.kind === 'chest' && (
         <>
           <div className="fx-head">宝箱をゲット！</div>
@@ -65,7 +75,7 @@ export function Rewards({ items, onDone }: { items: Reward[]; onDone: () => void
               <span>{heroHp(r.from)}</span>
               <span>→</span>
               <span className="new">{heroHp(r.to)}</span>
-              <span className="small" style={{ color: 'var(--green)' }}>
+              <span className="small" style={{ color: 'var(--hi-green)' }}>
                 (+{heroHp(r.to) - heroHp(r.from)})
               </span>
             </div>
@@ -75,7 +85,7 @@ export function Rewards({ items, onDone }: { items: Reward[]; onDone: () => void
               <span>{heroAtk(r.from)}</span>
               <span>→</span>
               <span className="new">{heroAtk(r.to)}</span>
-              <span className="small" style={{ color: 'var(--green)' }}>
+              <span className="small" style={{ color: 'var(--hi-green)' }}>
                 (+{heroAtk(r.to) - heroAtk(r.from)})
               </span>
             </div>
@@ -101,7 +111,8 @@ export function Rewards({ items, onDone }: { items: Reward[]; onDone: () => void
   );
 }
 
-function Items({ coins, xp, cards }: { coins: number; xp: number; cards: string[] }) {
+function Items({ coins, xp, cards, items = [] }: { coins: number; xp: number; cards: string[]; items?: string[] }) {
+  const itemCount = items.reduce<Record<string, number>>((m, id) => ({ ...m, [id]: (m[id] ?? 0) + 1 }), {});
   return (
     <div className="reward-items">
       {coins > 0 && (
@@ -114,6 +125,17 @@ function Items({ coins, xp, cards }: { coins: number; xp: number; cards: string[
           <img src={art('xp')} alt="" />+{xp}XP
         </div>
       )}
+      {Object.entries(itemCount).map(([id, n]) => {
+        const it = ITEM_INFO[id as ItemId];
+        if (!it) return null;
+        return (
+          <div key={id} style={{ animationDelay: '0.2s' }}>
+            <img src={art(it.img)} alt="" />
+            {it.name}
+            {n > 1 ? ` ×${n}` : ''}
+          </div>
+        );
+      })}
       {cards.slice(0, 3).map((id, n) => {
         const t = TERM_BY_ID.get(id);
         if (!t) return null;
@@ -125,6 +147,28 @@ function Items({ coins, xp, cards }: { coins: number; xp: number; cards: string[
         );
       })}
     </div>
+  );
+}
+
+/** 相棒のなかよしレベルが上がった */
+function Bond({ pet: id, to }: { pet: string; to: number }) {
+  const p = PETS.find((x) => x.id === id) ?? PETS[0];
+  const sk = SKILL_INFO[PET_SKILL[p.id] ?? 'heal'];
+  return (
+    <>
+      <div className="fx-head">なかよしレベルアップ！</div>
+      <img src={p.img} alt="" style={{ height: 110, marginTop: 14, position: 'relative' }} />
+      <div className="panel card-box center">
+        <b>
+          {p.name}のなかよしレベルが {to} になった！
+        </b>
+        <p className="small" style={{ margin: '6px 0 0', lineHeight: 1.6 }}>
+          技「{sk.name}」: {sk.note(to)}
+          <br />
+          技に要る正解の数: {gaugeNeed(to)}問
+        </p>
+      </div>
+    </>
   );
 }
 

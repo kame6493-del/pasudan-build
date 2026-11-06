@@ -4,6 +4,7 @@
 何度流しても同じ結果になる。
 Android の画像は WebP(品質90)で書く。PNG だと AAB が 10MB を超えて、ブラウザから Play へ上げられないため。"""
 from pathlib import Path
+import numpy as np
 from PIL import Image, ImageDraw
 
 APP = Path(__file__).resolve().parent.parent
@@ -34,11 +35,14 @@ for d, k in {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}.item
     rd = Image.new("RGBA", (n, n), (0, 0, 0, 0))
     rd.paste(sq, (0, 0), m)
     save_android(rd, RES / f"mipmap-{d}/ic_launcher_round.png")
-    # アダプティブ前景: 108dp のうち中央 72dp が見える。絵は全面に敷き、見える範囲に収まるよう少し縮める
+    # アダプティブ前景: 108dp のうち中央 72dp が見える(丸で切ると半径 36dp)。絵を 80% に縮めて剣の先まで丸の中に入れ、
+    # 外側は絵の縁を鏡に写して埋める(紺の枠が四角や角丸の切り抜きの隅に出ないように)
     f = round(108 * k)
-    inner = round(f * 80 / 108)
-    fg = Image.new("RGBA", (f, f), NAVY + (255,))
-    fg.paste(icon.resize((inner, inner), Image.LANCZOS), ((f - inner) // 2, (f - inner) // 2))
+    inner = round(f * 0.8)
+    pad = (f - inner) // 2
+    small = np.asarray(icon.resize((inner, inner), Image.LANCZOS))
+    full = np.pad(small, ((pad, f - inner - pad), (pad, f - inner - pad), (0, 0)), mode="reflect")
+    fg = Image.fromarray(full).convert("RGBA")
     save_android(fg, RES / f"mipmap-{d}/ic_launcher_foreground.png")
 (RES / "values/ic_launcher_background.xml").write_text(
     '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#%02X%02X%02X</color>\n</resources>\n' % NAVY, encoding="utf-8")

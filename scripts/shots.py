@@ -2,6 +2,7 @@
 先に npm run build と npm run preview(http://127.0.0.1:4350)。
 python scripts/shots.py [名前...] → ../shots/NN_名前.png"""
 import json
+import os
 import random
 import sys
 import time
@@ -12,9 +13,10 @@ from playwright.sync_api import sync_playwright
 
 sys.stdout.reconfigure(encoding="utf-8")
 APP = Path(__file__).resolve().parent.parent
-OUT = APP.parent / "shots"
-OUT.mkdir(exist_ok=True)
-URL = "http://127.0.0.1:4350/?mockbuy=1"
+OUT = Path(os.environ["SHOT_OUT"]) if os.environ.get("SHOT_OUT") else APP.parent / "shots"
+OUT.mkdir(parents=True, exist_ok=True)
+URL = os.environ.get("SHOT_URL", "http://127.0.0.1:4350/?mockbuy=1")
+VW, VH, DPR = int(os.environ.get("SHOT_W", 390)), int(os.environ.get("SHOT_H", 844)), float(os.environ.get("SHOT_DPR", 2))
 QS = json.load(open(APP / "src/data/questions.json", encoding="utf-8"))
 TERMS = json.load(open(APP / "src/data/terms.json", encoding="utf-8"))
 BY_TEXT = {q["q"]: q for q in QS}
@@ -63,8 +65,8 @@ def init(page_ctx, data, full=True):
 def answer_of(pg):
     t = pg.locator(".qtext").first.inner_text()
     q = BY_TEXT.get(t)
-    if not q:  # 改行の違いなど
-        q = next((x for x in QS if x["q"].replace("\n", "") == t.replace("\n", "")), None)
+    if not q:  # 表示では文ごとに区切るので、空白と改行を除いて比べる
+        q = next((x for x in QS if "".join(x["q"].split()) == "".join(t.split())), None)
     return q["answer"] if q else 0
 
 
@@ -86,7 +88,7 @@ with sync_playwright() as p:
     b = p.chromium.launch()
 
     def new(data, full=True):
-        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, locale="ja-JP", timezone_id="Asia/Tokyo")
+        ctx = b.new_context(viewport={"width": VW, "height": VH}, device_scale_factor=DPR, locale="ja-JP", timezone_id="Asia/Tokyo")
         init(ctx, data, full)
         pg = ctx.new_page()
         errs = []
@@ -196,9 +198,10 @@ with sync_playwright() as p:
             if pg.locator(".overlay").count():
                 shot(pg, "10b_after_chest")
     if want("zukan"):
-        pg.get_by_role("button", name="図鑑").click()
+        pg.get_by_role("button", name="学ぶ", exact=True).click()
         pg.wait_for_timeout(500)
         shot(pg, "11_zukan")
+        pg.locator(".scroll").evaluate("e => e.scrollTo(0, 400)")
         pg.get_by_role("button", name="すべてのカードを見る").click()
         pg.wait_for_timeout(500)
         shot(pg, "12_zukan_list")
@@ -206,13 +209,13 @@ with sync_playwright() as p:
         pg.wait_for_timeout(500)
         shot(pg, "13_term")
     if want("nigate"):
-        pg.get_by_role("button", name="苦手").click()
+        pg.get_by_role("button", name="苦手", exact=True).click()
         pg.wait_for_timeout(500)
         shot(pg, "14_nigate")
         pg.locator(".scroll").evaluate("e => e.scrollTo(0, 700)")
         shot(pg, "14b_nigate_list")
     if want("stats"):
-        pg.get_by_role("button", name="成績").click()
+        pg.get_by_role("button", name="成績", exact=True).click()
         pg.wait_for_timeout(500)
         shot(pg, "15_stats")
         pg.locator(".scroll").evaluate("e => e.scrollTo(0, 700)")
@@ -238,7 +241,7 @@ with sync_playwright() as p:
         pg.get_by_role("button", name="つづきから").click()
         pg.wait_for_timeout(600)
     if want("notes"):
-        pg.get_by_role("button", name="図鑑").click()
+        pg.get_by_role("button", name="学ぶ", exact=True).click()
         pg.wait_for_timeout(300)
         pg.locator(".notes-entry").click()
         pg.wait_for_timeout(500)
@@ -250,7 +253,7 @@ with sync_playwright() as p:
         pg.locator(".scroll").evaluate("e => e.scrollTo(0, 99999)")
         shot(pg, "25b_note_full_lower")
     if want("shop"):
-        pg.get_by_role("button", name="ショップ").click()
+        pg.get_by_role("button", name="ショップ", exact=True).click()
         pg.wait_for_timeout(500)
         shot(pg, "16_shop")
         pg.locator(".scroll").evaluate("e => e.scrollTo(0, 600)")
@@ -285,7 +288,7 @@ with sync_playwright() as p:
         pg.locator(".dungeon-card").nth(1).click()
         pg.wait_for_timeout(500)
         shot(pg, "19_free_locked_map")
-        pg.get_by_role("button", name="ショップ").click()
+        pg.get_by_role("button", name="ショップ", exact=True).click()
         pg.wait_for_timeout(500)
         shot(pg, "20_free_shop")
         pg.get_by_role("button", name="ダンジョン").last.click()
@@ -296,7 +299,7 @@ with sync_playwright() as p:
         pg.locator(".sheet").evaluate("e => e.scrollTo(0, 9999)")
         shot(pg, "21b_paywall_lower")
         pg.get_by_role("button", name="あとで").click()
-        pg.get_by_role("button", name="図鑑").click()
+        pg.get_by_role("button", name="学ぶ", exact=True).click()
         pg.wait_for_timeout(300)
         pg.locator(".notes-entry").click()
         pg.wait_for_timeout(500)
@@ -311,7 +314,7 @@ with sync_playwright() as p:
         pg.get_by_role("button", name="ダンジョン").last.click()
         pg.wait_for_timeout(300)
         pg.locator(".scroll").evaluate("e => e.scrollTo(0, 99999)")
-        pg.get_by_role("button", name="模擬試験に1回だけ無料で挑戦").click()
+        pg.locator(".btn.ghost").last.click()
         pg.wait_for_timeout(400)
         shot(pg, "24_exam_picker")
         print("errors:", errs[:5])

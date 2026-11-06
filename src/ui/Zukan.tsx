@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Q_BY_ID, TERM_BY_ID, TERMS } from '../domain/data';
 import { canEvolve } from '../domain/game';
+import { NextUp, PassRoad } from './Learn';
+import { bestiaryCount } from './Monsters';
 import type { Field, Term } from '../domain/types';
 import { art, DUNGEONS, FIELDS, FIELD_LABEL } from '../domain/world';
 import { LockIcon } from './icons';
@@ -16,8 +18,29 @@ export function Zukan() {
   const { data, go } = useStore();
   const all = rate(data.cards, TERMS);
   const gold = TERMS.filter((t) => data.cards[t.id] === 2).length;
+  const mb = bestiaryCount(data);
   return (
     <>
+      <NextUp tip />
+      <PassRoad compact />
+      <div className="learn-links">
+        <button className="panel learn-about" onClick={() => go({ name: 'cards' })}>
+          <img src={art('card_books')} alt="" style={{ borderRadius: 8 }} />
+          <span className="grow">
+            <b>覚えるカード</b>
+            <span className="small muted">まちがえた用語が入る</span>
+          </span>
+        </button>
+        <button className="panel learn-about" onClick={() => go({ name: 'bestiary' })}>
+          <img src={art('mon_slime')} alt="" />
+          <span className="grow">
+            <b>モンスター図鑑</b>
+            <span className="small muted">
+              {mb.got} / {mb.all}体
+            </span>
+          </span>
+        </button>
+      </div>
       <div className="panel center">
         <h2 style={{ justifyContent: 'center' }}>
           <img src={art('card_books')} alt="" style={{ height: 30, borderRadius: 6 }} />
@@ -38,7 +61,7 @@ export function Zukan() {
       <div className="panel">
         <div className="row">
           <b className="grow">全体の収集率</b>
-          <b style={{ fontSize: 28, color: 'var(--blue2)' }}>{all.pct}%</b>
+          <b style={{ fontSize: 28, color: 'var(--hi-blue)' }}>{all.pct}%</b>
         </div>
         <div className="bar gold" style={{ height: 16, marginTop: 6 }}>
           <i style={{ width: `${all.pct}%` }} />
@@ -75,6 +98,7 @@ export function Zukan() {
     </>
   );
 }
+
 
 type Filter = 'all' | 'none' | 'silver' | 'gold';
 
@@ -170,7 +194,7 @@ export function TermDetail({ id, back }: { id: string; back: Route }) {
         </h3>
         <div className="muted small">この用語の問題に2回続けて正解で金に進化！</div>
         {!evo && c === 1 && (
-          <button className="lock-row" style={{ marginTop: 6 }} onClick={() => askFull('用語カードが金に進化するのは完全版です。図鑑を金でうめて、苦手な用語をなくそう。')}>
+          <button className="lock-row" style={{ marginTop: 6 }} onClick={() => askFull('用語カードが金に進化するのは完全版です。図鑑を金でうめて、苦手な用語をなくそう。', 'zukan')}>
             <LockIcon size={14} color="#6b5a48" />
             <span className="grow">金への進化は完全版で</span>
             <span className="chev">›</span>

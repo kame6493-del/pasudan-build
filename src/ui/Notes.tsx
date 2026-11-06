@@ -33,7 +33,6 @@ function useNotes(): Note[] | null {
 
 export function NotesList({ field }: { field: Field }) {
   const { data, go } = useStore();
-  const notes = useNotes();
   const [f, setF] = useState<Field>(field);
   return (
     <>
@@ -53,7 +52,6 @@ export function NotesList({ field }: { field: Field }) {
         </div>
         {DUNGEONS[f].floors.map((topic, i) => {
           const open = floorOpen(data, f, i);
-          const has = notes?.some((n) => n.topic === topic);
           const count = QUESTIONS.filter((q) => q.topic === topic).length;
           return (
             <button key={topic} className="note-row" onClick={() => go({ name: 'note', field: f, topic, back: { name: 'notes', field: f } })}>
@@ -63,7 +61,7 @@ export function NotesList({ field }: { field: Field }) {
               <span className="grow">
                 <b>{topic}</b>
                 <span className="muted small">
-                  過去問 {count}問{has === false ? '・準備中' : ''}
+                  過去問 {count}問
                 </span>
               </span>
               {!open && (
@@ -96,7 +94,7 @@ export function NoteView({ field, topic, back }: { field: Field; topic: string; 
     return (
       <>
         {backBtn}
-        <div className="panel">このノートは準備中です。</div>
+        <div className="panel">このノートを開けませんでした。</div>
       </>
     );
   const shown = open ? n.sections : n.sections.slice(0, 1);
@@ -126,7 +124,7 @@ export function NoteView({ field, topic, back }: { field: Field; topic: string; 
                 続き（{n.sections.length - 1}項目・要点{n.points.length}個・ひっかけ{n.traps.length}個）は完全版で読めます
               </b>
             </div>
-            <button className="btn gold sm" style={{ width: 'auto' }} onClick={() => askFull(`「${topic}」の要点ノートの続きと、この階の冒険が開きます。`)}>
+            <button className="btn gold sm" style={{ width: 'auto' }} onClick={() => askFull(`「${topic}」の要点ノートの続きと、この階の冒険が開きます。`, 'note')}>
               見る
             </button>
           </div>

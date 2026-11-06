@@ -19,3 +19,14 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# パスダン: R8 を入れたときの保険(vc5)
+# Capacitor は JS との橋渡しとプラグインの登録をリフレクションで行うので、本体とプラグインは丸ごと残す
+-keep class com.getcapacitor.** { *; }
+-keep class com.capacitorjs.plugins.** { *; }
+-keep class com.revenuecat.purchases.capacitor.** { *; }
+-keep class com.revenuecat.purchases.hybridcommon.** { *; }
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,SourceFile,LineNumberTable

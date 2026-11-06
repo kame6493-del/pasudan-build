@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "node scripts/clean-dist.mjs && tsc -b && vite build && node scripts/phone.mjs",
     "check:answers": "python scripts/check_answers.py",
+    "check:choices": "python scripts/check_choice_explain.py",
     "test": "vitest run",
     "sync": "npm run build && cap sync",
     "preview": "vite preview --port 4350 --strictPort"
