@@ -123,7 +123,8 @@ export async function setAttrs(a: Attrs): Promise<void> {
     }
     return;
   }
-  if (!key) return;
+  // iOS ではストアのプライバシーの申告(ユーザ ID と購入履歴だけ)に合わせて送らない
+  if (!key || import.meta.env.VITE_IOS === '1') return;
   try {
     await ensure();
     await Purchases.setAttributes(a);
